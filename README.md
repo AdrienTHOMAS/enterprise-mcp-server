@@ -177,6 +177,107 @@ make docker-up
 | `datadog_create_event` | Create a Datadog event |
 | `datadog_search_logs` | Search logs |
 
+## Demo Mode
+
+**Try all 38 tools with zero configuration — no API keys needed.**
+
+```bash
+# One-liner: start the MCP server in demo mode
+ENTERPRISE_MCP_DEMO=true enterprise-mcp
+```
+
+Demo mode uses realistic mock data (20 Jira issues, 10 GitHub PRs, 15 Confluence pages, 5 Slack channels with history, PagerDuty incidents, Datadog monitors) so you can evaluate the full tool suite immediately.
+
+### Standalone Demo Script
+
+```bash
+# Run the interactive demo — see all connectors in action
+python examples/demo_mode.py
+```
+
+### Claude Desktop (Demo Mode)
+
+```json
+{
+  "mcpServers": {
+    "enterprise": {
+      "command": "enterprise-mcp",
+      "env": {
+        "ENTERPRISE_MCP_DEMO": "true"
+      }
+    }
+  }
+}
+```
+
+## Audit Trail
+
+Every tool call is recorded in an append-only JSONL audit log (`~/.enterprise-mcp/audit.jsonl`) with:
+
+- **Timestamp** (ISO 8601 UTC)
+- **Tool name** and **sanitized input parameters** (secrets auto-redacted)
+- **Success/failure** status, **duration** (ms), and **error** details
+- **Agent session ID** and **tenant ID** for multi-tenant environments
+
+### Built-in MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_audit_log` | Query audit entries — filter by tool name, date range, success/failure. Supports JSON and CSV output. |
+| `anonymize_audit_log` | GDPR compliance — irreversibly redacts PII (agent IDs, tenant IDs, input params) from entries older than a given date. |
+
+### GDPR Compliance
+
+```
+# Agent can anonymize old audit data
+anonymize_audit_log(before_date="2026-01-01T00:00:00Z")
+→ {"anonymized_entries": 1542, "status": "completed"}
+```
+
+PII fields (`agent_session_id`, `tenant_id`, `input_params`) are replaced with `[ANONYMIZED]`. The operation is irreversible and atomic (temp file + rename).
+
+## Plugin System
+
+Extend the server with custom connectors — no core code changes needed.
+
+### Building a Plugin
+
+1. Subclass `ConnectorPlugin` (or `ToolPlugin` for standalone tools):
+
+```python
+from enterprise_mcp.plugins import ConnectorPlugin
+
+class MyPlugin(ConnectorPlugin):
+    name = "my-service"
+    version = "1.0.0"
+
+    async def initialize(self, config):
+        self.client = MyClient(config["API_KEY"])
+
+    def get_tools(self):
+        return [(tool_def, handler), ...]
+```
+
+2. Register via Python entry point:
+
+```toml
+# pyproject.toml
+[project.entry-points."enterprise_mcp.connectors"]
+my-service = "my_package:MyPlugin"
+```
+
+Or drop into `~/.enterprise-mcp/plugins/my-service/` with a `plugin.json`.
+
+### Built-in MCP Tool
+
+| Tool | Description |
+|------|-------------|
+| `list_plugins` | Shows all available plugins with name, version, type, enabled status, and tool count. |
+
+### Example: Notion Plugin
+
+See [`plugins/examples/notion_plugin.py`](src/enterprise_mcp/plugins/examples/notion_plugin.py) — a complete Notion connector plugin with 5 tools (search, get page, get database, query database, create page).
+
 ## Production Deployment
 
 ### Docker
@@ -346,6 +447,7 @@ make typecheck
 | `DATADOG_API_KEY` | For Datadog | Datadog API key |
 | `DATADOG_APP_KEY` | For Datadog | Datadog application key |
 | `DATADOG_SITE` | No | Datadog site (default: datadoghq.com) |
+| `ENTERPRISE_MCP_DEMO` | No | Enable demo mode with mock data (default: false) |
 | `REDIS_URL` | No | Redis URL for caching |
 | `LOG_LEVEL` | No | Logging level (default: INFO) |
 | `HEALTH_PORT` | No | Health check port (default: 8080) |

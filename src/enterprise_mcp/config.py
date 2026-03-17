@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     # Multi-tenant
     tenant_config_path: str = Field(default="", description="Path to tenant config YAML file")
 
+    # Demo mode
+    enterprise_mcp_demo: bool = Field(
+        default=False,
+        description="Enable demo mode — all connectors use realistic mock data, no API keys needed",
+    )
+
     # Server
     server_name: str = Field(default="enterprise-mcp", description="MCP server name")
     log_level: str = Field(default="INFO", description="Logging level")

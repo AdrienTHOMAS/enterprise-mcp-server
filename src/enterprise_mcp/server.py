@@ -10,28 +10,17 @@ Usage:
 """
 
 import json
-import sys
+import time
 from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from .audit import get_audit_logger, register_audit_tools
 from .config import settings
-from .connectors.confluence import ConfluenceConnector
-from .connectors.datadog import DatadogConnector
-from .connectors.github import GitHubConnector
-from .connectors.jira import JiraConnector
-from .connectors.pagerduty import PagerDutyConnector
-from .connectors.slack import SlackConnector
 from .observability import get_logger, setup_logging, traced_tool_call
-from .tools.confluence_tools import register_confluence_tools
-from .tools.datadog_tools import register_datadog_tools
-from .tools.github_tools import register_github_tools
-from .tools.jira_tools import register_jira_tools
-from .tools.pagerduty_tools import register_pagerduty_tools
 from .tools.registry import get_all_tools, get_handler, tool_count
-from .tools.slack_tools import register_slack_tools
 
 # ---- Logging setup ------------------------------------------------------- #
 
@@ -55,67 +44,113 @@ def _init_connectors() -> None:
 
     active: list[str] = []
 
-    if settings.jira_base_url and settings.jira_email and settings.jira_api_token:
-        jira = JiraConnector(
-            settings.jira_base_url, settings.jira_email, settings.jira_api_token
+    if settings.enterprise_mcp_demo:
+        # Demo mode: use mock connectors — zero API keys needed
+        from .demo.mock_connectors import (
+            MockConfluenceConnector,
+            MockDatadogConnector,
+            MockGitHubConnector,
+            MockJiraConnector,
+            MockPagerDutyConnector,
+            MockSlackConnector,
         )
-        register_jira_tools(jira)
-        active.append("Jira (8 tools)")
-    else:
-        logger.warning("connector_disabled", service="jira", reason="credentials not configured")
+        from .tools.confluence_tools import register_confluence_tools
+        from .tools.datadog_tools import register_datadog_tools
+        from .tools.github_tools import register_github_tools
+        from .tools.jira_tools import register_jira_tools
+        from .tools.pagerduty_tools import register_pagerduty_tools
+        from .tools.slack_tools import register_slack_tools
 
-    if settings.github_token:
-        github = GitHubConnector(settings.github_token, settings.github_default_owner)
-        register_github_tools(github)
-        active.append("GitHub (8 tools)")
+        register_jira_tools(MockJiraConnector())  # type: ignore[arg-type]
+        register_github_tools(MockGitHubConnector())  # type: ignore[arg-type]
+        register_confluence_tools(MockConfluenceConnector())  # type: ignore[arg-type]
+        register_slack_tools(MockSlackConnector())  # type: ignore[arg-type]
+        register_pagerduty_tools(MockPagerDutyConnector())  # type: ignore[arg-type]
+        register_datadog_tools(MockDatadogConnector())  # type: ignore[arg-type]
+        active.append("DEMO MODE (all 6 connectors with mock data)")
     else:
-        logger.warning("connector_disabled", service="github", reason="token not configured")
+        # Production mode: conditionally register based on env vars
+        from .connectors.confluence import ConfluenceConnector
+        from .connectors.datadog import DatadogConnector
+        from .connectors.github import GitHubConnector
+        from .connectors.jira import JiraConnector
+        from .connectors.pagerduty import PagerDutyConnector
+        from .connectors.slack import SlackConnector
+        from .tools.confluence_tools import register_confluence_tools
+        from .tools.datadog_tools import register_datadog_tools
+        from .tools.github_tools import register_github_tools
+        from .tools.jira_tools import register_jira_tools
+        from .tools.pagerduty_tools import register_pagerduty_tools
+        from .tools.slack_tools import register_slack_tools
 
-    if (
-        settings.confluence_base_url
-        and settings.confluence_email
-        and settings.confluence_api_token
-    ):
-        confluence = ConfluenceConnector(
-            settings.confluence_base_url,
-            settings.confluence_email,
-            settings.confluence_api_token,
-        )
-        register_confluence_tools(confluence)
-        active.append("Confluence (6 tools)")
-    else:
-        logger.warning("connector_disabled", service="confluence", reason="credentials not configured")
+        if settings.jira_base_url and settings.jira_email and settings.jira_api_token:
+            jira = JiraConnector(
+                settings.jira_base_url, settings.jira_email, settings.jira_api_token
+            )
+            register_jira_tools(jira)
+            active.append("Jira (8 tools)")
+        else:
+            logger.warning("connector_disabled", service="jira", reason="credentials not configured")
 
-    if settings.slack_bot_token:
-        slack = SlackConnector(settings.slack_bot_token)
-        register_slack_tools(slack)
-        active.append("Slack (6 tools)")
-    else:
-        logger.warning("connector_disabled", service="slack", reason="token not configured")
+        if settings.github_token:
+            github = GitHubConnector(settings.github_token, settings.github_default_owner)
+            register_github_tools(github)
+            active.append("GitHub (8 tools)")
+        else:
+            logger.warning("connector_disabled", service="github", reason="token not configured")
 
-    if settings.pagerduty_api_key:
-        pagerduty = PagerDutyConnector(
-            settings.pagerduty_api_key, settings.pagerduty_from_email
-        )
-        register_pagerduty_tools(pagerduty)
-        active.append("PagerDuty (5 tools)")
-    else:
-        logger.warning("connector_disabled", service="pagerduty", reason="API key not configured")
+        if (
+            settings.confluence_base_url
+            and settings.confluence_email
+            and settings.confluence_api_token
+        ):
+            confluence = ConfluenceConnector(
+                settings.confluence_base_url,
+                settings.confluence_email,
+                settings.confluence_api_token,
+            )
+            register_confluence_tools(confluence)
+            active.append("Confluence (6 tools)")
+        else:
+            logger.warning("connector_disabled", service="confluence", reason="credentials not configured")
 
-    if settings.datadog_api_key and settings.datadog_app_key:
-        datadog = DatadogConnector(
-            settings.datadog_api_key, settings.datadog_app_key, settings.datadog_site
-        )
-        register_datadog_tools(datadog)
-        active.append("Datadog (5 tools)")
-    else:
-        logger.warning("connector_disabled", service="datadog", reason="API keys not configured")
+        if settings.slack_bot_token:
+            slack = SlackConnector(settings.slack_bot_token)
+            register_slack_tools(slack)
+            active.append("Slack (6 tools)")
+        else:
+            logger.warning("connector_disabled", service="slack", reason="token not configured")
+
+        if settings.pagerduty_api_key:
+            pagerduty = PagerDutyConnector(
+                settings.pagerduty_api_key, settings.pagerduty_from_email
+            )
+            register_pagerduty_tools(pagerduty)
+            active.append("PagerDuty (5 tools)")
+        else:
+            logger.warning("connector_disabled", service="pagerduty", reason="API key not configured")
+
+        if settings.datadog_api_key and settings.datadog_app_key:
+            datadog = DatadogConnector(
+                settings.datadog_api_key, settings.datadog_app_key, settings.datadog_site
+            )
+            register_datadog_tools(datadog)
+            active.append("Datadog (5 tools)")
+        else:
+            logger.warning("connector_disabled", service="datadog", reason="API keys not configured")
+
+    # Register enterprise tools (audit, plugins)
+    register_audit_tools()
+
+    from .plugins.registry import register_plugin_tools
+    register_plugin_tools()
 
     _connectors_ready = True
     logger.info(
         "server_ready",
         tool_count=tool_count(),
         connectors=", ".join(active) if active else "none",
+        demo_mode=settings.enterprise_mcp_demo,
     )
 
 
@@ -133,7 +168,7 @@ async def list_tools() -> list[Tool]:
 
 @app.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
-    """Dispatch a tool call to the appropriate handler with tracing."""
+    """Dispatch a tool call to the appropriate handler with tracing and audit logging."""
     _init_connectors()
     handler = get_handler(name)
 
@@ -142,12 +177,24 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         logger.error("unknown_tool", tool_name=name)
         return [TextContent(type="text", text=json.dumps({"error": error_msg}))]
 
+    audit = get_audit_logger()
+    start = time.monotonic()
     try:
         result = await traced_tool_call(name, handler, **arguments)
         if not isinstance(result, str):
             result = json.dumps(result, indent=2, default=str)
+        duration_ms = (time.monotonic() - start) * 1000
+        audit.log_tool_call(
+            tool_name=name, input_params=arguments, output=result,
+            duration_ms=duration_ms, success=True,
+        )
         return [TextContent(type="text", text=result)]
     except Exception as exc:
+        duration_ms = (time.monotonic() - start) * 1000
+        audit.log_tool_call(
+            tool_name=name, input_params=arguments, output="",
+            duration_ms=duration_ms, success=False, error=str(exc),
+        )
         logger.exception("tool_call_exception", tool_name=name)
         return [TextContent(type="text", text=json.dumps({"error": str(exc)}))]
 
