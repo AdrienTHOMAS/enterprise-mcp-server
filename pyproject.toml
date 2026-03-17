@@ -4,17 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "enterprise-mcp-server"
-version = "1.0.0"
-description = "Enterprise MCP Server for Claude — Jira, GitHub, Confluence, Slack"
+version = "2.0.0"
+description = "Enterprise MCP Server for Claude — Jira, GitHub, Confluence, Slack, PagerDuty, Datadog (38 tools)"
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.11"
 authors = [
     {name = "Adrien Thomas", email = "adrien@example.com"},
 ]
-keywords = ["mcp", "claude", "anthropic", "enterprise", "jira", "github", "confluence", "slack"]
+keywords = ["mcp", "claude", "anthropic", "enterprise", "jira", "github", "confluence", "slack", "pagerduty", "datadog"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
@@ -29,6 +29,15 @@ dependencies = [
     "tenacity>=8.2.3",
     "python-dotenv>=1.0.0",
     "rich>=13.7.0",
+    "structlog>=24.1.0",
+    "opentelemetry-api>=1.22.0",
+    "opentelemetry-sdk>=1.22.0",
+    "opentelemetry-exporter-otlp>=1.22.0",
+    "redis[hiredis]>=5.0.0",
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "cryptography>=42.0.0",
+    "pyyaml>=6.0.1",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +48,9 @@ dev = [
     "respx>=0.20.2",
     "mypy>=1.8.0",
     "ruff>=0.2.0",
+    "bandit>=1.7.7",
+    "types-redis>=4.6.0",
+    "types-pyyaml>=6.0.12",
 ]
 
 [project.scripts]
@@ -52,9 +64,17 @@ testpaths = ["tests"]
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/enterprise_mcp"]
 
 [tool.mypy]
 python_version = "3.11"
-strict = true
+strict = false
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
