@@ -1,6 +1,6 @@
 """Enterprise MCP Server — main entry point.
 
-Exposes 38 tools across Jira, GitHub, Confluence, Slack, PagerDuty, and Datadog
+Exposes 40 tools across Jira, GitHub, Confluence, Slack, PagerDuty, Datadog, and Recipes
 to Claude agents via the Model Context Protocol (MCP).
 
 Usage:
@@ -30,6 +30,7 @@ from .tools.datadog_tools import register_datadog_tools
 from .tools.github_tools import register_github_tools
 from .tools.jira_tools import register_jira_tools
 from .tools.pagerduty_tools import register_pagerduty_tools
+from .tools.recipe_tools import register_recipe_tools
 from .tools.registry import get_all_tools, get_handler, tool_count
 from .tools.slack_tools import register_slack_tools
 
@@ -110,6 +111,10 @@ def _init_connectors() -> None:
         active.append("Datadog (5 tools)")
     else:
         logger.warning("connector_disabled", service="datadog", reason="API keys not configured")
+
+    # Always register recipe tools (they delegate to connector tools at runtime)
+    register_recipe_tools()
+    active.append("Recipes (2 tools)")
 
     _connectors_ready = True
     logger.info(

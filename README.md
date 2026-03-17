@@ -3,12 +3,12 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
-[![38 Tools](https://img.shields.io/badge/tools-38-purple.svg)](#tools-reference)
+[![40 Tools](https://img.shields.io/badge/tools-40-purple.svg)](#tools-reference)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg)](#docker-deployment)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF.svg)](.github/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-report-brightgreen.svg)](#testing)
 
-**Production-grade MCP server exposing Jira, GitHub, Confluence, Slack, PagerDuty, and Datadog to Claude agents with 38 tools, Redis caching, circuit breakers, webhooks, and multi-tenant support.**
+**Production-grade MCP server exposing Jira, GitHub, Confluence, Slack, PagerDuty, and Datadog to Claude agents with 40 tools, 6 agent recipes, Redis caching, circuit breakers, webhooks, and multi-tenant support.**
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -107,7 +107,22 @@ enterprise-mcp
 make docker-up
 ```
 
-## Tools Reference (38 Tools)
+## Agent Recipes
+
+Pre-built agentic workflows for common enterprise scenarios. One prompt triggers a multi-tool sequence across all your systems.
+
+| Recipe | Trigger | Tools Used |
+|--------|---------|-----------|
+| Incident Triage | "P1 alert fired" | Jira + GitHub + Confluence + PagerDuty + Slack |
+| Sprint Review | "Generate sprint report" | Jira + GitHub + Confluence + Slack |
+| PR Review | "Review this PR" | GitHub + Confluence |
+| Developer Onboarding | "Onboard new engineer" | Jira + Confluence + GitHub + Slack |
+| Weekly Digest | "Weekly engineering digest" | All tools |
+| Bug Triage | "New bug report" | Jira + GitHub + Datadog |
+
+Use `list_recipes` to discover available recipes and `run_recipe` to execute them. See [docs/RECIPES.md](docs/RECIPES.md) for full documentation.
+
+## Tools Reference (40 Tools)
 
 ### Jira (8 tools)
 
@@ -176,6 +191,13 @@ make docker-up
 | `datadog_get_monitor_status` | Get monitor status |
 | `datadog_create_event` | Create a Datadog event |
 | `datadog_search_logs` | Search logs |
+
+### Recipes (2 tools)
+
+| Tool | Description |
+|------|-------------|
+| `list_recipes` | List available agent recipes with descriptions and required tools |
+| `run_recipe` | Execute a recipe by name with context parameters |
 
 ## Production Deployment
 
