@@ -1,7 +1,7 @@
 """Enterprise MCP Server — main entry point.
 
-Exposes 40 tools across Jira, GitHub, Confluence, Slack, PagerDuty, Datadog, and Recipes
-to Claude agents via the Model Context Protocol (MCP).
+Exposes 43 tools across Jira, GitHub, Confluence, Slack, PagerDuty, Datadog,
+Recipes, and Semantic Search to Claude agents via the Model Context Protocol (MCP).
 
 Usage:
     python -m enterprise_mcp.server
@@ -25,6 +25,9 @@ from .connectors.jira import JiraConnector
 from .connectors.pagerduty import PagerDutyConnector
 from .connectors.slack import SlackConnector
 from .observability import get_logger, setup_logging, traced_tool_call
+from .rag.embeddings import EmbeddingService
+from .rag.indexer import EnterpriseIndexer
+from .rag.vector_store import VectorStore
 from .tools.confluence_tools import register_confluence_tools
 from .tools.datadog_tools import register_datadog_tools
 from .tools.github_tools import register_github_tools
@@ -32,6 +35,7 @@ from .tools.jira_tools import register_jira_tools
 from .tools.pagerduty_tools import register_pagerduty_tools
 from .tools.recipe_tools import register_recipe_tools
 from .tools.registry import get_all_tools, get_handler, tool_count
+from .tools.search_tools import register_search_tools
 from .tools.slack_tools import register_slack_tools
 
 # ---- Logging setup ------------------------------------------------------- #
@@ -55,6 +59,9 @@ def _init_connectors() -> None:
         return
 
     active: list[str] = []
+    jira: JiraConnector | None = None
+    github: GitHubConnector | None = None
+    confluence: ConfluenceConnector | None = None
 
     if settings.jira_base_url and settings.jira_email and settings.jira_api_token:
         jira = JiraConnector(
@@ -115,6 +122,26 @@ def _init_connectors() -> None:
     # Always register recipe tools (they delegate to connector tools at runtime)
     register_recipe_tools()
     active.append("Recipes (2 tools)")
+
+    # ---- RAG / Semantic Search ------------------------------------------- #
+
+    if settings.rag_enabled:
+        embedding_service = EmbeddingService(model_name=settings.rag_embedding_model)
+        vector_store = VectorStore(persist_path=settings.rag_persist_path)
+        indexer = EnterpriseIndexer(
+            embedding_service,
+            vector_store,
+            jira_connector=jira,
+            confluence_connector=confluence,
+            github_connector=github,
+        )
+        register_search_tools(embedding_service, vector_store, indexer)
+        active.append("Semantic Search (3 tools)")
+        logger.info(
+            "rag_enabled",
+            backend=embedding_service.backend,
+            persist=bool(settings.rag_persist_path),
+        )
 
     _connectors_ready = True
     logger.info(
