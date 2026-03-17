@@ -3,12 +3,12 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
-[![43 Tools](https://img.shields.io/badge/tools-43-purple.svg)](#tools-reference)
+[![38 Tools](https://img.shields.io/badge/tools-38-purple.svg)](#tools-reference)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg)](#docker-deployment)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF.svg)](.github/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-report-brightgreen.svg)](#testing)
 
-**Production-grade MCP server exposing Jira, GitHub, Confluence, Slack, PagerDuty, and Datadog to Claude agents with 43 tools, semantic search / RAG, agent recipes, Redis caching, circuit breakers, webhooks, and multi-tenant support.**
+**Production-grade MCP server exposing Jira, GitHub, Confluence, Slack, PagerDuty, and Datadog to Claude agents with 38 tools, Redis caching, circuit breakers, webhooks, and multi-tenant support.**
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -107,22 +107,7 @@ enterprise-mcp
 make docker-up
 ```
 
-## Agent Recipes
-
-Pre-built agentic workflows for common enterprise scenarios. One prompt triggers a multi-tool sequence across all your systems.
-
-| Recipe | Trigger | Tools Used |
-|--------|---------|-----------|
-| Incident Triage | "P1 alert fired" | Jira + GitHub + Confluence + PagerDuty + Slack |
-| Sprint Review | "Generate sprint report" | Jira + GitHub + Confluence + Slack |
-| PR Review | "Review this PR" | GitHub + Confluence |
-| Developer Onboarding | "Onboard new engineer" | Jira + Confluence + GitHub + Slack |
-| Weekly Digest | "Weekly engineering digest" | All tools |
-| Bug Triage | "New bug report" | Jira + GitHub + Datadog |
-
-Use `list_recipes` to discover available recipes and `run_recipe` to execute them. See [docs/RECIPES.md](docs/RECIPES.md) for full documentation.
-
-## Tools Reference (43 Tools)
+## Tools Reference (38 Tools)
 
 ### Jira (8 tools)
 
@@ -192,71 +177,106 @@ Use `list_recipes` to discover available recipes and `run_recipe` to execute the
 | `datadog_create_event` | Create a Datadog event |
 | `datadog_search_logs` | Search logs |
 
-### Recipes (2 tools)
+## Demo Mode
 
-| Tool | Description |
-|------|-------------|
-| `list_recipes` | List available agent recipes with descriptions and required tools |
-| `run_recipe` | Execute a recipe by name with context parameters |
+**Try all 38 tools with zero configuration — no API keys needed.**
 
-### Semantic Search (3 tools)
-
-| Tool | Description |
-|------|-------------|
-| `semantic_search` | Search all enterprise content by meaning (Jira, Confluence, GitHub). Unlike keyword search, understands semantic similarity |
-| `find_similar_issues` | Find Jira issues similar to a description — useful for duplicate detection before creating new issues |
-| `knowledge_search` | Search Confluence knowledge base by semantic meaning, with optional space key filtering |
-
-## Semantic Search / RAG Layer
-
-The server includes a built-in Retrieval-Augmented Generation (RAG) layer that enables semantic search across all indexed enterprise content without any external vector database.
-
-### How It Works
-
-```
-┌───────────────┐     ┌──────────────────┐     ┌────────────────┐
-│  Jira Issues  │────►│                  │────►│                │
-│  Confluence   │────►│  EnterpriseIndexer│────►│  VectorStore   │
-│  GitHub READMEs│────►│  (embed + index) │────►│  (cosine sim)  │
-└───────────────┘     └──────────────────┘     └────────────────┘
-                                                       │
-                      ┌──────────────────┐             │
-                      │  semantic_search  │◄────────────┘
-                      │  find_similar_issues│
-                      │  knowledge_search │
-                      └──────────────────┘
-```
-
-### Embedding Backends
-
-The embedding service auto-detects the best available backend:
-
-1. **sentence-transformers** (preferred) — `all-MiniLM-L6-v2`, 384-dim vectors, high quality
-2. **scikit-learn TF-IDF** (fallback) — 256-dim, decent quality, lighter dependency
-3. **Simple hash-based** (minimal) — 128-dim, no ML dependencies required
-
-Install the full RAG backend:
 ```bash
-pip install enterprise-mcp-server[rag]
+# One-liner: start the MCP server in demo mode
+ENTERPRISE_MCP_DEMO=true enterprise-mcp
 ```
 
-### Configuration
+Demo mode uses realistic mock data (20 Jira issues, 10 GitHub PRs, 15 Confluence pages, 5 Slack channels with history, PagerDuty incidents, Datadog monitors) so you can evaluate the full tool suite immediately.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RAG_ENABLED` | `true` | Enable/disable the RAG layer |
-| `RAG_PERSIST_PATH` | `""` | JSON file path for vector store persistence |
-| `RAG_EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence-transformers model name |
-| `RAG_INDEX_INTERVAL` | `600` | Background re-indexing interval (seconds) |
+### Standalone Demo Script
 
-### Features
+```bash
+# Run the interactive demo — see all connectors in action
+python examples/demo_mode.py
+```
 
-- **Local embeddings** — no external API calls, runs entirely on your machine
-- **LRU cache** — up to 1,000 embedding entries cached in memory
-- **Incremental indexing** — only re-indexes content updated since last run
-- **JSON persistence** — vector store saves/loads from disk (no external DB needed)
-- **Source filtering** — search across all sources or restrict to Jira, Confluence, or GitHub
-- **Duplicate detection** — `find_similar_issues` helps avoid creating duplicate Jira tickets
+### Claude Desktop (Demo Mode)
+
+```json
+{
+  "mcpServers": {
+    "enterprise": {
+      "command": "enterprise-mcp",
+      "env": {
+        "ENTERPRISE_MCP_DEMO": "true"
+      }
+    }
+  }
+}
+```
+
+## Audit Trail
+
+Every tool call is recorded in an append-only JSONL audit log (`~/.enterprise-mcp/audit.jsonl`) with:
+
+- **Timestamp** (ISO 8601 UTC)
+- **Tool name** and **sanitized input parameters** (secrets auto-redacted)
+- **Success/failure** status, **duration** (ms), and **error** details
+- **Agent session ID** and **tenant ID** for multi-tenant environments
+
+### Built-in MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_audit_log` | Query audit entries — filter by tool name, date range, success/failure. Supports JSON and CSV output. |
+| `anonymize_audit_log` | GDPR compliance — irreversibly redacts PII (agent IDs, tenant IDs, input params) from entries older than a given date. |
+
+### GDPR Compliance
+
+```
+# Agent can anonymize old audit data
+anonymize_audit_log(before_date="2026-01-01T00:00:00Z")
+→ {"anonymized_entries": 1542, "status": "completed"}
+```
+
+PII fields (`agent_session_id`, `tenant_id`, `input_params`) are replaced with `[ANONYMIZED]`. The operation is irreversible and atomic (temp file + rename).
+
+## Plugin System
+
+Extend the server with custom connectors — no core code changes needed.
+
+### Building a Plugin
+
+1. Subclass `ConnectorPlugin` (or `ToolPlugin` for standalone tools):
+
+```python
+from enterprise_mcp.plugins import ConnectorPlugin
+
+class MyPlugin(ConnectorPlugin):
+    name = "my-service"
+    version = "1.0.0"
+
+    async def initialize(self, config):
+        self.client = MyClient(config["API_KEY"])
+
+    def get_tools(self):
+        return [(tool_def, handler), ...]
+```
+
+2. Register via Python entry point:
+
+```toml
+# pyproject.toml
+[project.entry-points."enterprise_mcp.connectors"]
+my-service = "my_package:MyPlugin"
+```
+
+Or drop into `~/.enterprise-mcp/plugins/my-service/` with a `plugin.json`.
+
+### Built-in MCP Tool
+
+| Tool | Description |
+|------|-------------|
+| `list_plugins` | Shows all available plugins with name, version, type, enabled status, and tool count. |
+
+### Example: Notion Plugin
+
+See [`plugins/examples/notion_plugin.py`](src/enterprise_mcp/plugins/examples/notion_plugin.py) — a complete Notion connector plugin with 5 tools (search, get page, get database, query database, create page).
 
 ## Production Deployment
 
@@ -427,15 +447,12 @@ make typecheck
 | `DATADOG_API_KEY` | For Datadog | Datadog API key |
 | `DATADOG_APP_KEY` | For Datadog | Datadog application key |
 | `DATADOG_SITE` | No | Datadog site (default: datadoghq.com) |
+| `ENTERPRISE_MCP_DEMO` | No | Enable demo mode with mock data (default: false) |
 | `REDIS_URL` | No | Redis URL for caching |
 | `LOG_LEVEL` | No | Logging level (default: INFO) |
 | `HEALTH_PORT` | No | Health check port (default: 8080) |
 | `WEBHOOK_PORT` | No | Webhook port (default: 8081) |
 | `OTLP_ENDPOINT` | No | OpenTelemetry collector endpoint |
-| `RAG_ENABLED` | No | Enable semantic search (default: true) |
-| `RAG_PERSIST_PATH` | No | Vector store JSON persistence path |
-| `RAG_EMBEDDING_MODEL` | No | Embedding model (default: all-MiniLM-L6-v2) |
-| `RAG_INDEX_INTERVAL` | No | Background indexing interval in seconds |
 
 ## Claude Desktop Integration
 

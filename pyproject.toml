@@ -65,6 +65,7 @@ dev = [
 
 [project.scripts]
 enterprise-mcp = "enterprise_mcp.server:main"
+enterprise-mcp-demo = "enterprise_mcp.demo.demo_server:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
