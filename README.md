@@ -3,12 +3,12 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
-[![38 Tools](https://img.shields.io/badge/tools-38-purple.svg)](#tools-reference)
+[![41 Tools](https://img.shields.io/badge/tools-41-purple.svg)](#tools-reference)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg)](#docker-deployment)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF.svg)](.github/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-report-brightgreen.svg)](#testing)
 
-**Production-grade MCP server exposing Jira, GitHub, Confluence, Slack, PagerDuty, and Datadog to Claude agents with 38 tools, Redis caching, circuit breakers, webhooks, and multi-tenant support.**
+**Production-grade MCP server exposing Jira, GitHub, Confluence, Slack, PagerDuty, and Datadog to Claude agents with 41 tools, semantic search / RAG, Redis caching, circuit breakers, webhooks, and multi-tenant support.**
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -107,7 +107,7 @@ enterprise-mcp
 make docker-up
 ```
 
-## Tools Reference (38 Tools)
+## Tools Reference (41 Tools)
 
 ### Jira (8 tools)
 
@@ -176,6 +176,65 @@ make docker-up
 | `datadog_get_monitor_status` | Get monitor status |
 | `datadog_create_event` | Create a Datadog event |
 | `datadog_search_logs` | Search logs |
+
+### Semantic Search (3 tools)
+
+| Tool | Description |
+|------|-------------|
+| `semantic_search` | Search all enterprise content by meaning (Jira, Confluence, GitHub). Unlike keyword search, understands semantic similarity |
+| `find_similar_issues` | Find Jira issues similar to a description — useful for duplicate detection before creating new issues |
+| `knowledge_search` | Search Confluence knowledge base by semantic meaning, with optional space key filtering |
+
+## Semantic Search / RAG Layer
+
+The server includes a built-in Retrieval-Augmented Generation (RAG) layer that enables semantic search across all indexed enterprise content without any external vector database.
+
+### How It Works
+
+```
+┌───────────────┐     ┌──────────────────┐     ┌────────────────┐
+│  Jira Issues  │────►│                  │────►│                │
+│  Confluence   │────►│  EnterpriseIndexer│────►│  VectorStore   │
+│  GitHub READMEs│────►│  (embed + index) │────►│  (cosine sim)  │
+└───────────────┘     └──────────────────┘     └────────────────┘
+                                                       │
+                      ┌──────────────────┐             │
+                      │  semantic_search  │◄────────────┘
+                      │  find_similar_issues│
+                      │  knowledge_search │
+                      └──────────────────┘
+```
+
+### Embedding Backends
+
+The embedding service auto-detects the best available backend:
+
+1. **sentence-transformers** (preferred) — `all-MiniLM-L6-v2`, 384-dim vectors, high quality
+2. **scikit-learn TF-IDF** (fallback) — 256-dim, decent quality, lighter dependency
+3. **Simple hash-based** (minimal) — 128-dim, no ML dependencies required
+
+Install the full RAG backend:
+```bash
+pip install enterprise-mcp-server[rag]
+```
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RAG_ENABLED` | `true` | Enable/disable the RAG layer |
+| `RAG_PERSIST_PATH` | `""` | JSON file path for vector store persistence |
+| `RAG_EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence-transformers model name |
+| `RAG_INDEX_INTERVAL` | `600` | Background re-indexing interval (seconds) |
+
+### Features
+
+- **Local embeddings** — no external API calls, runs entirely on your machine
+- **LRU cache** — up to 1,000 embedding entries cached in memory
+- **Incremental indexing** — only re-indexes content updated since last run
+- **JSON persistence** — vector store saves/loads from disk (no external DB needed)
+- **Source filtering** — search across all sources or restrict to Jira, Confluence, or GitHub
+- **Duplicate detection** — `find_similar_issues` helps avoid creating duplicate Jira tickets
 
 ## Production Deployment
 
@@ -351,6 +410,10 @@ make typecheck
 | `HEALTH_PORT` | No | Health check port (default: 8080) |
 | `WEBHOOK_PORT` | No | Webhook port (default: 8081) |
 | `OTLP_ENDPOINT` | No | OpenTelemetry collector endpoint |
+| `RAG_ENABLED` | No | Enable semantic search (default: true) |
+| `RAG_PERSIST_PATH` | No | Vector store JSON persistence path |
+| `RAG_EMBEDDING_MODEL` | No | Embedding model (default: all-MiniLM-L6-v2) |
+| `RAG_INDEX_INTERVAL` | No | Background indexing interval in seconds |
 
 ## Claude Desktop Integration
 

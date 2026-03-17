@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "enterprise-mcp-server"
 version = "2.0.0"
-description = "Enterprise MCP Server for Claude — Jira, GitHub, Confluence, Slack, PagerDuty, Datadog (38 tools)"
+description = "Enterprise MCP Server for Claude — Jira, GitHub, Confluence, Slack, PagerDuty, Datadog + Semantic Search (41 tools)"
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.11"
@@ -38,9 +38,19 @@ dependencies = [
     "uvicorn[standard]>=0.27.0",
     "cryptography>=42.0.0",
     "pyyaml>=6.0.1",
+    "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]
+rag = [
+    "sentence-transformers>=2.3.0",
+    "numpy>=1.26.0",
+]
+rag-chroma = [
+    "sentence-transformers>=2.3.0",
+    "numpy>=1.26.0",
+    "chromadb>=0.4.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",

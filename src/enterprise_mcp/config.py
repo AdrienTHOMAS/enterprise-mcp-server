@@ -65,6 +65,20 @@ class Settings(BaseSettings):
     # Multi-tenant
     tenant_config_path: str = Field(default="", description="Path to tenant config YAML file")
 
+    # RAG / Semantic Search
+    rag_enabled: bool = Field(
+        default=True, description="Enable semantic search / RAG layer"
+    )
+    rag_persist_path: str = Field(
+        default="", description="File path for vector store persistence (JSON)"
+    )
+    rag_embedding_model: str = Field(
+        default="all-MiniLM-L6-v2", description="Sentence-transformers model name"
+    )
+    rag_index_interval: int = Field(
+        default=600, description="Background indexing interval in seconds (default 10 min)"
+    )
+
     # Server
     server_name: str = Field(default="enterprise-mcp", description="MCP server name")
     log_level: str = Field(default="INFO", description="Logging level")
